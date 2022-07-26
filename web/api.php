@@ -333,6 +333,7 @@
                             $ssh_config = json_decode($ssh_config);
                             $system_config->tunnel->profile->ssh = $profile;
                             $system_config->server = $ssh_config->ip;
+                            $system_config->cdn_server = $ssh_config->http->proxy->ip;
                             $system_config->tun2socks->udpgw->ip = $ssh_config->udpgw->ip;
                             $system_config->tun2socks->udpgw->port = $ssh_config->udpgw->port;
                             break;
