@@ -22,7 +22,7 @@ SOCKS_SERVER="${SOCKS_IP}:${SOCKS_PORT}"
 UDPGW_IP="$(grep 'ip":' ${SYSTEM_CONFIG} | awk '{print $2}' | sed 's/,//g; s/"//g' | sed -n '2p')"
 UDPGW_PORT="$(grep 'port":' ${SYSTEM_CONFIG} | awk '{print $2}' | sed 's/,//g; s/"//g' | sed -n '2p')"
 UDPGW="${UDPGW_IP}:${UDPGW_PORT}"
-GATEWAY="$(ip route | grep -v tun | awk '/default/ { print $3 }')"
+source /lib/functions/network.sh; network_find_wan NET_IF; network_get_ipaddr GATEWAY "${NET_IF}"
 SERVER_IP="$(grep 'server":' ${SYSTEM_CONFIG} | awk '{print $2}' | sed 's/,//g; s/"//g' | sed -n '1p')"
 CDN_IP="$(grep 'cdn_server":' ${SYSTEM_CONFIG} | awk '{print $2}' | sed 's/,//g; s/"//g' | sed -n '1p')"
 readarray -t PROXY_IPS < <(jq -r '.proxy_servers[]' < ${SYSTEM_CONFIG})
@@ -62,8 +62,8 @@ function start_tun2socks {
     screen -AmdS badvpn-tun2socks badvpn-tun2socks --loglevel 0 --tundev ${TUN_DEV} --netif-ipaddr ${TUN_ADDRESS} --netif-netmask ${TUN_NETMASK} --socks-server-addr ${SOCKS_SERVER} --udpgw-remote-server-addr "${UDPGW}"
   fi
   # removing default route
-  echo ${DEFAULT_ROUTE} > ${ROUTE_LOG} \
-    && ip route del ${DEFAULT_ROUTE}
+  ip route show | grep 'metric 10' | (while read -r line ; do echo ${line} >> ${ROUTE_LOG}; done)
+  ip route show | grep 'metric 10' | (while read -r line ; do ip route del $(echo $line); done)
   # add default route to tun2socks
   ip route add default via ${TUN_ADDRESS} metric 6
   echo -e "Tun2socks started!"
@@ -80,8 +80,8 @@ function stop_tun2socks {
     kill $(screen -list | grep badvpn-tun2socks | awk -F '[.]' {'print $1'})
   fi
   # recover default route
-  ip route add $(cat "${ROUTE_LOG}") \
-    && rm -rf "${ROUTE_LOG}"
+  while read -r line ; do ip route add $(echo $line); done  < ${ROUTE_LOG}
+  rm -rf "${ROUTE_LOG}"
   # remove default route to tun2socks
   ip route del default via ${TUN_ADDRESS} metric 6
   echo -e "Tun2socks stopped!"
